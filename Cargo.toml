@@ -1,0 +1,3 @@
+[workspace]
+members = ["ff","ff-bench-atime", "ff-bench-fsync"]
+resolver = "3"
