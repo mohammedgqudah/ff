@@ -124,10 +124,15 @@ pub fn unmount_new<P: AsRef<Path>>(device: P) -> Result<()> {
     Ok(())
 }
 
-/// Prepares `device` for testing by creating a new `filesystem`, unmounting any existing mounts
-/// on `ff_dir`, and mounting the fresh filesystem at `ff_dir` with the given `mount_options`.
+/// Prepares `device` for testing by creating a new `filesystem`, unmounting `device`,
+/// and mounting the fresh filesystem at `ff_dir` with the given `mount_options`.
 ///
 /// Intended for use in binaries to provide a ready-to-use mount point.
+///
+/// # Example
+/// ```no_run
+/// let (device, ff_dir) = setup_and_mount(args.fs, args.mount_options)?;
+/// ```
 pub fn setup_and_mount<S: AsRef<str>>(
     filesystem: S,
     mount_options: S,

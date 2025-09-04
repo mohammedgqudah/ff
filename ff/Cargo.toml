@@ -5,5 +5,6 @@ edition = "2024"
 
 [dependencies]
 anyhow = "1.0.99"
+humantime = "2.2.0"
 nix = { version = "0.30.1", features = ["mount", "feature"] }
 statistical = "1.0.0"

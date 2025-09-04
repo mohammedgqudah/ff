@@ -1,3 +1,6 @@
+use std::time::Duration;
+
+use humantime::format_duration;
 use nix::sys::utsname::uname;
 use statistical::{mean, median, standard_deviation};
 
@@ -31,16 +34,35 @@ pub fn summary(mut samples_ns: Vec<f64>) {
     };
 
     println!();
-    println!("mean   : {mu:.2} ns");
-    println!("median : {med:.2} ns");
-    println!("stdev  : {sd:.2} ns");
-    println!("p50    : {:.2} ns", pct(50.0));
-    println!("p90    : {:.2} ns", pct(90.0));
-    println!("p99    : {:.2} ns", pct(99.0));
+    println!("ops/sec: {:.2}", 1e9 / mu);
     println!(
-        "min/max: {:.2} / {:.2} ns",
-        samples_ns.first().unwrap(),
-        samples_ns.last().unwrap()
+        "mean   : {}",
+        format_duration(Duration::from_nanos(mu as u64))
+    );
+    println!(
+        "median : {}",
+        format_duration(Duration::from_nanos(med as u64))
+    );
+    println!(
+        "stdev  : {}",
+        format_duration(Duration::from_nanos(sd as u64))
+    );
+    println!(
+        "p50    : {}",
+        format_duration(Duration::from_nanos(pct(50.0) as u64))
+    );
+    println!(
+        "p90    : {}",
+        format_duration(Duration::from_nanos(pct(90.0) as u64))
+    );
+    println!(
+        "p99    : {}",
+        format_duration(Duration::from_nanos(pct(99.0) as u64))
+    );
+    println!(
+        "min/max: {} / {}",
+        format_duration(Duration::from_nanos(*samples_ns.first().unwrap() as u64)),
+        format_duration(Duration::from_nanos(*samples_ns.last().unwrap() as u64)),
     );
 }
 
