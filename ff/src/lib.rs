@@ -1,6 +1,8 @@
+use nix::sys::utsname::uname;
 use statistical::{mean, median, standard_deviation};
 
 pub mod fs;
+pub mod mount;
 
 pub fn summary(mut samples_ns: Vec<f64>) {
     println!("=> generating summary");
@@ -40,4 +42,33 @@ pub fn summary(mut samples_ns: Vec<f64>) {
         samples_ns.first().unwrap(),
         samples_ns.last().unwrap()
     );
+}
+
+pub struct KernelVersion {
+    major: u32,
+    minor: u32,
+    #[allow(dead_code)]
+    patch: u32,
+}
+
+impl KernelVersion {
+    pub fn current() -> Self {
+        let release = uname().expect("should be able to uname");
+        let release = release.release().to_string_lossy();
+        let mut parts = release.split(['.', '-']);
+
+        let major = parts.next().unwrap().parse().unwrap();
+        let minor = parts.next().unwrap().parse().unwrap();
+        let patch = parts.next().unwrap().parse().unwrap();
+
+        KernelVersion {
+            major,
+            minor,
+            patch,
+        }
+    }
+
+    pub fn at_least(&self, maj: u32, min: u32) -> bool {
+        (self.major, self.minor) >= (maj, min)
+    }
 }

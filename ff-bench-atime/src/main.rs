@@ -29,8 +29,8 @@ fn main() -> Result<()> {
     println!("=> ff-bench directory: {:#?}", ff_dir.as_path());
 
     unmount(&ff_dir)?;
-    mkfs(&dev)?;
-    mount_ff_bench(&dev, &ff_dir, args.atime.into())?;
+    mkfs(&dev, "ext4")?; // TODO: accept --fs {} instead of hardcoding ext4
+    mount_ff_bench(&dev, &ff_dir, "ext4", args.atime.into(), &"".into())?;
 
     let mut test_file = OpenOptions::new()
         .read(true)
