@@ -26,7 +26,7 @@ fn main() -> Result<()> {
     }
 
     let args = Args::parse();
-    let (dev, ff_dir) = setup_and_mount(args.fs, args.mount_options)?;
+    let (dev, ff_dir) = setup_and_mount(None::<String>, args.fs, args.mount_options)?;
 
     println!("=> found ff-bench device: {:#?}", dev.as_path());
     println!("=> ff-bench directory: {:#?}", ff_dir.as_path());

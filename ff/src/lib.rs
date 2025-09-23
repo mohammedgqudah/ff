@@ -6,6 +6,9 @@ use statistical::{mean, median, standard_deviation};
 
 pub mod fs;
 pub mod mount;
+pub mod pagemap;
+pub mod args;
+pub mod devicemapper;
 
 pub fn summary(mut samples_ns: Vec<f64>) {
     println!("=> generating summary");
