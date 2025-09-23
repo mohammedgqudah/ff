@@ -34,3 +34,18 @@ pub fn parse_as_range<S: AsRef<str>>(range: S) -> Result<Range<u64>> {
         None => first..first + 1,
     })
 }
+
+#[cfg(test)]
+mod test {
+    use super::parse_as_range;
+
+    #[test]
+    fn it_parses_a_single_number() {
+        assert_eq!(parse_as_range("10").unwrap(), 10..11);
+    }
+
+    #[test]
+    fn it_parses_a_range() {
+        assert_eq!(parse_as_range("20-27").unwrap(), 20..27);
+    }
+}
