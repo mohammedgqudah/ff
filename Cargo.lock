@@ -434,16 +434,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ff-bench-vm"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap",
- "ff",
- "indicatif",
-]
-
-[[package]]
 name = "ff-trace-fsync"
 version = "0.1.0"
 dependencies = [
@@ -452,10 +442,12 @@ dependencies = [
  "clap",
  "colored",
  "devicemapper",
+ "env_logger",
  "ff",
  "fiemap",
  "indicatif",
  "libc",
+ "log",
  "nix",
 ]
 

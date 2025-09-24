@@ -1,0 +1,18 @@
+[package]
+name = "ff-trace-fsync"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+ff = {path = "../ff"}
+anyhow = "1.0.99"
+clap = { version = "4.5.46", features = ["derive"] }
+indicatif = "0.18.0"
+devicemapper = "0.34.5"
+fiemap = "0.2.0"
+nix = "0.30.1"
+bitflags = "2.9.4"
+libc = "0.2.175"
+colored = "3.0.0"
+log = "0.4.28"
+env_logger = "0.11.8"
