@@ -1,3 +1,10 @@
 [workspace]
-members = ["ff","ff-bench-atime", "ff-bench-fsync", "ff-trace-fsync"]
+members = ["ff","ff-bench-atime", "ff-bench-fsync", "ff-cache", "ff-trace-fsync"]
 resolver = "3"
+
+[profile.release]
+strip = true
+opt-level = "z" 
+lto = true
+panic = "abort"
+codegen-units = 1

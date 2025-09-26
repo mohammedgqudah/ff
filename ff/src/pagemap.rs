@@ -1,18 +1,34 @@
 //! inspect file page maps.
 use anyhow::{Context, Result, ensure};
 use bitflags::bitflags;
+use colored::Colorize;
+use log::debug;
 use nix::{
-    libc::{MAP_FAILED, MAP_PRIVATE, PROT_READ, mmap64},
+    libc::{
+        MADV_RANDOM, MAP_FAILED, MAP_PRIVATE, MAP_SHARED, POSIX_FADV_DONTNEED, PROT_NONE,
+        PROT_READ, madvise, mincore, mmap64, munmap, posix_fadvise64,
+    },
     sys::statfs::fstatfs,
     unistd::sysconf,
 };
 use std::{
-    fs::OpenOptions,
+    fs::{File, OpenOptions},
     os::{
         fd::{AsFd, AsRawFd},
         unix::fs::FileExt,
     },
 };
+
+macro_rules! cvt {
+    ($expr:expr) => {{
+        let ret = $expr;
+        if ret == 0 {
+            Ok(())
+        } else {
+            Err(std::io::Error::last_os_error())
+        }
+    }};
+}
 
 // link: https://www.kernel.org/doc/Documentation/vm/pagemap.txt
 //
@@ -29,11 +45,13 @@ use std::{
 // bit  63    page present
 bitflags! {
    /// A 64-bit entry in /proc/self/pagemap
+   /// see: `man 5 proc_pid_pagemap`
    #[derive(Debug)]
    pub struct PageMapEntry: u64 {
         const SOFT_DIRTY = 1 << 55;
         const EXCL_MAP = 1 << 56;
-        const PTE_UDDF_WP_WR_PROTECTED = 1 << 57;
+        // If set, the page is write-protected through userfaultfd(2).
+        const PTE_UFFD_WP_WR_PROTECTED = 1 << 57;
         const PTE_GUARD_REGION = 1 << 58;
         const FILE_PAGE_OR_SHARED_ANON = 1 << 61;
         const SWAPPED = 1 << 62;
@@ -74,20 +92,24 @@ bitflags! {
 }
 
 pub trait PageMapExt {
-    fn page_info(&mut self, page: usize) -> Result<(PageMapEntry, KPageFlags)>;
+    fn page_info(&self, page: usize) -> Result<(PageMapEntry, KPageFlags)>;
+    fn evict_pages(&self) -> Result<()>;
+    fn resident_pages(&self) -> Result<Vec<u64>>;
     fn fs_block_size(&self) -> Result<usize>;
 }
 
-impl<T: AsFd> PageMapExt for T {
+impl PageMapExt for File {
     fn fs_block_size(&self) -> Result<usize> {
         let stats = fstatfs(&self).context("failed to get stats for file")?;
         Ok(stats.block_size() as usize)
     }
 
-    fn page_info(&mut self, page: usize) -> Result<(PageMapEntry, KPageFlags)> {
-        let vm_page = sysconf(nix::unistd::SysconfVar::PAGE_SIZE)
-            .context("failed to get sys page size")?
-            .unwrap() as usize;
+    /// Returns the page map entry and kernel flags for `page`.
+    ///
+    /// This will fault the page in to make it present.
+    fn page_info(&self, page: usize) -> Result<(PageMapEntry, KPageFlags)> {
+        // TODO: check file_len before dereferencing
+        let vm_page = vm_page_size()?;
 
         let fs_block_size = self.fs_block_size()?;
 
@@ -114,12 +136,15 @@ impl<T: AsFd> PageMapExt for T {
             page,
             self.as_fd().as_raw_fd()
         );
-        ensure!(
-            mmap_address.is_aligned(),
-            "failed to mmap page `{}` for `{}` because the returned addressis not aligned",
-            page,
-            self.as_fd().as_raw_fd()
-        );
+
+        // Touching a non-present page (page fault) will trigger a readahead by the linux kernel, which
+        // will bring adjecent pages into cache.
+        //
+        // Note: The man page doesn't explicitly say that `MADV_RANDOM` is guaranteed to disable readahead,
+        // but it strongly suggets that, and the kernel function `do_sync_mmap_readahead` returns
+        // early if the VMA has the RAND_READ flag.
+        cvt!(unsafe { madvise(mmap_address, vm_page, MADV_RANDOM) })
+            .context("failed to disable readahead on mmaped region")?;
 
         // SAFETY: this is a valid aligned pointer.
         unsafe {
@@ -128,6 +153,7 @@ impl<T: AsFd> PageMapExt for T {
         }
 
         let pagemap_entry = get_page_map_entry((mmap_address as usize) / vm_page)?;
+        // ideally, this should never error because we faulted the page.
         let pfn = pagemap_entry.pfn().context(format!(
             "the PFN for {} is not present",
             self.as_fd().as_raw_fd()
@@ -135,7 +161,120 @@ impl<T: AsFd> PageMapExt for T {
 
         let kpage_flags = get_kernel_page(pfn)?;
 
+        // SAFETY: we are unmapping an mmaped region that we no longer use or need.
+        let munmap_ret = unsafe { munmap(mmap_address, vm_page) };
+
+        ensure!(
+            munmap_ret == 0,
+            "failed to munmap page `{}` for `{}`",
+            page,
+            self.as_fd().as_raw_fd()
+        );
+
         Ok((pagemap_entry, kpage_flags))
+    }
+
+    /// Returns a list of file pages present in the page cache.
+    ///
+    /// See `man 2 mincore` and `man 2 posix_fadvise`:
+    ///
+    /// > One can obtain a snapshot of which pages of a file are resident in
+    /// > the buffer cache by  opening  a  file,  mapping  it  with
+    /// > mmap(2), and then applying mincore(2) to the mapping.
+    fn resident_pages(&self) -> Result<Vec<u64>> {
+        let vm_page = vm_page_size()? as u64;
+        let len = self
+            .metadata()
+            .context("failed getting metadata for the file")?
+            .len();
+        let number_of_pages = len.div_ceil(vm_page as u64);
+
+        debug!("file has `{}` pages", number_of_pages.to_string().bold());
+
+        // SAFETY: we have exclusive access to the file.
+        let mmap_address = unsafe {
+            mmap64(
+                std::ptr::null_mut(),
+                (vm_page * number_of_pages) as usize,
+                PROT_NONE,
+                MAP_SHARED,
+                self.as_fd().as_raw_fd(),
+                0,
+            )
+        };
+
+        ensure!(
+            mmap_address != MAP_FAILED,
+            "faied to mmap file `{}`",
+            self.as_raw_fd(),
+        );
+
+        let mut vec = vec![0u8; number_of_pages as usize];
+
+        // SAFETY: vec is large enough and is a buffer of bytes
+        let mincore_ret = unsafe {
+            mincore(
+                mmap_address,
+                (vm_page * number_of_pages) as usize,
+                vec.as_mut_ptr() as _,
+            )
+        };
+        ensure!(
+            mincore_ret == 0,
+            "mincore(2) failed for `{}`",
+            self.as_raw_fd(),
+        );
+
+        // SAFETY: we are unmapping an mmaped region that we no longer use or need.
+        let munmap_ret = unsafe { munmap(mmap_address, (vm_page * number_of_pages) as usize) };
+
+        ensure!(
+            munmap_ret == 0,
+            "failed to munmap page `{}`",
+            self.as_fd().as_raw_fd()
+        );
+
+        Ok(vec
+            .iter()
+            .enumerate()
+            .filter_map(|(page_num, b)| {
+                // if the page is in page cache then it will not be zero,
+                // because the least significant bit will be set. See: `man 2 mincore`
+                if *b != 0 { Some(page_num as u64) } else { None }
+            })
+            .collect())
+    }
+
+    /// Returns a list of file pages present in the page cache.
+    fn evict_pages(&self) -> Result<()> {
+        let vm_page = vm_page_size()?;
+        let len = self
+            .metadata()
+            .context("failed getting metadata for the file")?
+            .len();
+        let number_of_pages = len.div_ceil(vm_page as u64) as usize;
+
+        // SAFETY: we have exclusive access to the file.
+        let mmap_address = unsafe {
+            mmap64(
+                std::ptr::null_mut(),
+                (vm_page * number_of_pages) as usize,
+                PROT_NONE,
+                MAP_PRIVATE,
+                self.as_fd().as_raw_fd(),
+                0,
+            )
+        };
+
+        ensure!(
+            mmap_address != MAP_FAILED,
+            "faied to mmap file `{}`",
+            self.as_raw_fd(),
+        );
+
+        let ret = unsafe { posix_fadvise64(self.as_raw_fd(), 0, len as _, POSIX_FADV_DONTNEED) };
+        assert!(ret == 0, "couldnt evict");
+        Ok(())
     }
 }
 
@@ -179,6 +318,7 @@ impl PageMapEntry {
         let pfn = self.bits() & pfn_mask;
 
         if self.contains(PageMapEntry::PRESENT) {
+            // TODO: this will be zero if user is not a superuser. Show a better error message.
             assert!(pfn != 0);
             Some(pfn)
         } else {
@@ -196,4 +336,10 @@ impl std::fmt::Display for PageMapEntry {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         bitflags::parser::to_writer(self, f)
     }
+}
+
+pub fn vm_page_size() -> Result<usize> {
+    Ok(sysconf(nix::unistd::SysconfVar::PAGE_SIZE)
+        .context("failed to get sys page size")?
+        .expect("page_size should be a supported option") as usize)
 }
