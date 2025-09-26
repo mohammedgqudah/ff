@@ -154,7 +154,7 @@ impl PageMapExt for File {
 
         let pagemap_entry = get_page_map_entry((mmap_address as usize) / vm_page)?;
         // ideally, this should never error because we faulted the page.
-        let pfn = pagemap_entry.pfn().context(format!(
+        let pfn = pagemap_entry.pfn()?.context(format!(
             "the PFN for {} is not present",
             self.as_fd().as_raw_fd()
         ))?;
@@ -311,18 +311,21 @@ pub fn get_kernel_page(pfn: u64) -> Result<KPageFlags> {
     Ok(KPageFlags::from_bits_retain(raw_entry))
 }
 
+pub enum PFNResult {}
 impl PageMapEntry {
-    pub fn pfn(&self) -> Option<u64> {
+    pub fn pfn(&self) -> Result<Option<u64>> {
         // docs: bits 0-54  page frame number (PFN) if present
         let pfn_mask = (1u64 << 55) - 1;
         let pfn = self.bits() & pfn_mask;
 
         if self.contains(PageMapEntry::PRESENT) {
-            // TODO: this will be zero if user is not a superuser. Show a better error message.
-            assert!(pfn != 0);
-            Some(pfn)
+            ensure!(
+                pfn != 0,
+                "The page is present but the PFN is hidden. Run again as root."
+            );
+            Ok(Some(pfn))
         } else {
-            None
+            Ok(None)
         }
     }
 }
@@ -342,4 +345,28 @@ pub fn vm_page_size() -> Result<usize> {
     Ok(sysconf(nix::unistd::SysconfVar::PAGE_SIZE)
         .context("failed to get sys page size")?
         .expect("page_size should be a supported option") as usize)
+}
+
+#[cfg(test)]
+mod test {
+    use bitflags::Flags;
+
+    use crate::pagemap::PageMapEntry;
+
+    #[test]
+    fn test_page_map_entry_pfn() {
+        let mut entry = PageMapEntry::empty();
+        entry.set(PageMapEntry::PRESENT, false);
+        assert!(entry.pfn().unwrap().is_none());
+
+        entry.set(PageMapEntry::PRESENT, true);
+        assert!(entry.pfn().is_err());
+        assert!(
+            entry
+                .pfn()
+                .unwrap_err()
+                .to_string()
+                .contains("Run again as root")
+        );
+    }
 }
