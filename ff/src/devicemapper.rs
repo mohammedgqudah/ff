@@ -27,7 +27,7 @@ pub fn dm_table_for_bad_range(
         return vec![(0, total_blocks, "linear".into(), format!("{device} 0"))];
     };
     assert!(
-        bad.len() != 0,
+        !bad.is_empty(),
         "the list of bad ranges cannot be empty, pass None instead"
     );
 

@@ -100,7 +100,7 @@ pub trait PageMapExt {
 
 impl PageMapExt for File {
     fn fs_block_size(&self) -> Result<usize> {
-        let stats = fstatfs(&self).context("failed to get stats for file")?;
+        let stats = fstatfs(self).context("failed to get stats for file")?;
         Ok(stats.block_size() as usize)
     }
 

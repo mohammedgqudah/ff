@@ -62,18 +62,18 @@ enum Mode {
 /// Update the device table.
 fn remap_device(dm: DM, dev_id: &DevId, table: &[(u64, u64, String, String)]) -> Result<()> {
     // load
-    dm.table_load(&dev_id, table, DmOptions::default())
+    dm.table_load(dev_id, table, DmOptions::default())
         .context("failed to reload DM targets")?;
 
     // suspend
     dm.device_suspend(
-        &dev_id,
+        dev_id,
         DmOptions::default().set_flags(DmFlags::DM_SUSPEND | DmFlags::DM_NOFLUSH),
     )
     .context("failed to suspend DM device")?;
 
     // resume the device
-    dm.device_suspend(&dev_id, DmOptions::default().set_flags(DmFlags::DM_NOFLUSH))
+    dm.device_suspend(dev_id, DmOptions::default().set_flags(DmFlags::DM_NOFLUSH))
         .context("failed to resume DM device")?;
 
     Ok(())
@@ -136,17 +136,14 @@ fn main() -> Result<()> {
 
     let extent = dbg_extent(&file)?;
 
-    let mut buf = Vec::with_capacity(args.pages * fs_block_size);
-    unsafe {
-        buf.set_len(buf.capacity());
-    }
+    let mut buf = vec![0u8; args.pages * fs_block_size];
     buf.fill(120);
 
     file.write_at("HELLO!!!".as_bytes(), 0x1000)?;
     file.sync_all()?;
 
     let write_result = file.write(buf.as_slice());
-    if let Err(_) = write_result {
+    if write_result.is_err() {
         let message = format!("writing {} page(s) failed", args.pages);
         println!("{}", message.red());
     } else {
@@ -159,6 +156,7 @@ fn main() -> Result<()> {
     let table = dm_table_for_bad_range(
         ff_device(),
         total_blocks,
+        #[allow(clippy::single_range_in_vec_init)]
         Some(&[start_blk..start_blk + 1]), // fail the first block of the file
     );
 
@@ -171,7 +169,7 @@ fn main() -> Result<()> {
     };
     match args.mode {
         Mode::FSync | Mode::FDataSync => {
-            if let Err(_) = sync_result {
+            if sync_result.is_err() {
                 println!("{}", "sync failed".red());
             } else {
                 println!("{}", "sync succeeded".green());
@@ -180,7 +178,7 @@ fn main() -> Result<()> {
         _ => (),
     };
 
-    let mut file = if args.reopen {
+    let file = if args.reopen {
         println!("=> closing old file");
         drop(file);
         OpenOptions::new()
@@ -236,5 +234,6 @@ fn dbg_extent(file: &File) -> Result<fiemap::FiemapExtent> {
         "fs pages in extent".dimmed(),
         extent.fe_length / fs_block_size as u64
     );
-    Ok(extent.clone())
+
+    Ok(*extent)
 }

@@ -163,7 +163,7 @@ pub fn setup_and_mount<S: AsRef<str>, P: Into<PathBuf>>(
     mount_options: S,
 ) -> Result<(PathBuf, PathBuf)> {
     let (mnt_flags, fs_data) = msflags_from_mount_opts(mount_options.as_ref())?;
-    let device: PathBuf = device.map(Into::into).unwrap_or_else(|| ff_device());
+    let device: PathBuf = device.map(Into::into).unwrap_or_else(ff_device);
 
     let device = std::fs::canonicalize(&device)
         .context(format!("{} is not a valid os path", device.display()))?;
