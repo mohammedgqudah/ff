@@ -4,11 +4,11 @@ use humantime::format_duration;
 use nix::sys::utsname::uname;
 use statistical::{mean, median, standard_deviation};
 
+pub mod args;
+pub mod devicemapper;
 pub mod fs;
 pub mod mount;
 pub mod pagemap;
-pub mod args;
-pub mod devicemapper;
 
 pub fn summary(mut samples_ns: Vec<f64>) {
     println!("=> generating summary");
