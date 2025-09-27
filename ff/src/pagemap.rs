@@ -195,6 +195,10 @@ impl PageMapExt for File {
         let vm_page = vm_page_size()?;
         let number_of_pages = self.vm_pages_count()?;
 
+        if number_of_pages == 0 {
+            return Ok(vec![]);
+        }
+
         debug!("file has `{}` pages", number_of_pages.to_string().bold());
 
         // SAFETY: we have exclusive access to the file.
@@ -211,8 +215,9 @@ impl PageMapExt for File {
 
         ensure!(
             mmap_address != MAP_FAILED,
-            "faied to mmap file `{}`",
+            "failed to mmap file `{}`: {:#?}",
             self.as_raw_fd(),
+            std::io::Error::last_os_error()
         );
 
         let mut vec = vec![0u8; number_of_pages as usize];

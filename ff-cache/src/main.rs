@@ -5,6 +5,7 @@ use colored::Colorize;
 use ff::pagemap::{PageMapExt, vm_page_size};
 use humansize::{BINARY, format_size};
 use log::{LevelFilter, debug};
+use std::cmp::min;
 use std::fs::OpenOptions;
 use std::io::Write;
 
@@ -67,7 +68,11 @@ fn main() -> Result<()> {
             "\t\tEvicted {}/{} {}/{}",
             resident_pages.len().to_string().bold(),
             number_of_pages.to_string().bold(),
-            format_size((resident_pages.len() as u64) * vm_page_size, formatter).bold(),
+            format_size(
+                min((resident_pages.len() as u64) * vm_page_size, len),
+                formatter
+            )
+            .bold(),
             format_size(len, formatter).bold()
         );
 
@@ -78,7 +83,11 @@ fn main() -> Result<()> {
         "\t\tResident Pages: {}/{} {}/{}",
         resident_pages.len().to_string().bold(),
         number_of_pages.to_string().bold(),
-        format_size((resident_pages.len() as u64) * vm_page_size, formatter).bold(),
+        format_size(
+            min((resident_pages.len() as u64) * vm_page_size, len),
+            formatter
+        )
+        .bold(),
         format_size(len, formatter).bold()
     );
     if args.verbose {
