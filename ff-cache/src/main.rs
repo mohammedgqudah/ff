@@ -67,7 +67,7 @@ fn main() -> Result<()> {
             "\t\tEvicted {}/{} {}/{}",
             resident_pages.len().to_string().bold(),
             number_of_pages.to_string().bold(),
-            format_size(resident_pages.len() * vm_page_size, formatter).bold(),
+            format_size((resident_pages.len() as u64) * vm_page_size, formatter).bold(),
             format_size(len, formatter).bold()
         );
 
@@ -78,12 +78,12 @@ fn main() -> Result<()> {
         "\t\tResident Pages: {}/{} {}/{}",
         resident_pages.len().to_string().bold(),
         number_of_pages.to_string().bold(),
-        format_size(resident_pages.len() * vm_page_size, formatter).bold(),
+        format_size((resident_pages.len() as u64) * vm_page_size, formatter).bold(),
         format_size(len, formatter).bold()
     );
     if args.verbose {
         for i in resident_pages {
-            let (pagemap, kflags) = file.page_info(i as usize)?;
+            let (pagemap, kflags) = file.page_info(i)?;
             println!("{} {}", "PAGE".bold(), i.to_string().cyan());
 
             println!(

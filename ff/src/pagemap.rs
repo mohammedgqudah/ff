@@ -92,49 +92,59 @@ bitflags! {
 }
 
 pub trait PageMapExt {
-    fn page_info(&self, page: usize) -> Result<(PageMapEntry, KPageFlags)>;
+    fn page_info(&self, page: u64) -> Result<(PageMapEntry, KPageFlags)>;
     fn evict_pages(&self) -> Result<()>;
     fn resident_pages(&self) -> Result<Vec<u64>>;
-    fn fs_block_size(&self) -> Result<usize>;
+    fn fs_block_size(&self) -> Result<u64>;
+    fn vm_pages_count(&self) -> Result<u64>;
 }
 
 impl PageMapExt for File {
-    fn fs_block_size(&self) -> Result<usize> {
+    fn fs_block_size(&self) -> Result<u64> {
         let stats = fstatfs(self).context("failed to get stats for file")?;
-        Ok(stats.block_size() as usize)
+        Ok(stats.block_size() as u64)
+    }
+
+    /// Returns the number of pages in a file.
+    fn vm_pages_count(&self) -> Result<u64> {
+        let vm_page = vm_page_size()?;
+        let len = self
+            .metadata()
+            .context("failed getting metadata for the file")?
+            .len();
+
+        Ok(len.div_ceil(vm_page as u64))
     }
 
     /// Returns the page map entry and kernel flags for `page`.
     ///
     /// This will fault the page in to make it present.
-    fn page_info(&self, page: usize) -> Result<(PageMapEntry, KPageFlags)> {
-        // TODO: check file_len before dereferencing
+    fn page_info(&self, page: u64) -> Result<(PageMapEntry, KPageFlags)> {
         let vm_page = vm_page_size()?;
-
-        let fs_block_size = self.fs_block_size()?;
-
-        let byte_off = fs_block_size * page;
-        // mmap offset must be aligned to vm page size.
-        let mmap_off = byte_off & !(vm_page - 1);
-        let delta = byte_off - mmap_off;
+        let pages = self.vm_pages_count()?;
+        ensure!(
+            page < pages,
+            "page index {page} out of bounds; total pages = {pages}"
+        );
 
         // SAFETY: we have exclusive access to the file.
         let mmap_address = unsafe {
             mmap64(
                 std::ptr::null_mut(),
-                vm_page,
+                vm_page as _,
                 PROT_READ,
                 MAP_PRIVATE,
                 self.as_fd().as_raw_fd(),
-                mmap_off as i64,
+                (vm_page * page) as _,
             )
         };
 
         ensure!(
             mmap_address != MAP_FAILED,
-            "failed to mmap page `{}` for `{}`",
+            "failed to mmap page `{}` for `{}`: {:#?}",
             page,
-            self.as_fd().as_raw_fd()
+            self.as_fd().as_raw_fd(),
+            std::io::Error::last_os_error()
         );
 
         // Touching a non-present page (page fault) will trigger a readahead by the linux kernel, which
@@ -143,16 +153,16 @@ impl PageMapExt for File {
         // Note: The man page doesn't explicitly say that `MADV_RANDOM` is guaranteed to disable readahead,
         // but it strongly suggets that, and the kernel function `do_sync_mmap_readahead` returns
         // early if the VMA has the RAND_READ flag.
-        cvt!(unsafe { madvise(mmap_address, vm_page, MADV_RANDOM) })
+        cvt!(unsafe { madvise(mmap_address, vm_page as _, MADV_RANDOM) })
             .context("failed to disable readahead on mmaped region")?;
 
         // SAFETY: this is a valid aligned pointer.
         unsafe {
             // read one byte to cause a page fault and make the page present.
-            mmap_address.add(delta).cast::<u8>().read_volatile();
+            mmap_address.cast::<u8>().read_volatile();
         }
 
-        let pagemap_entry = get_page_map_entry((mmap_address as usize) / vm_page)?;
+        let pagemap_entry = get_page_map_entry((mmap_address as u64) / vm_page)?;
         // ideally, this should never error because we faulted the page.
         let pfn = pagemap_entry.pfn()?.context(format!(
             "the PFN for {} is not present",
@@ -162,7 +172,7 @@ impl PageMapExt for File {
         let kpage_flags = get_kernel_page(pfn)?;
 
         // SAFETY: we are unmapping an mmaped region that we no longer use or need.
-        let munmap_ret = unsafe { munmap(mmap_address, vm_page) };
+        let munmap_ret = unsafe { munmap(mmap_address, vm_page as _) };
 
         ensure!(
             munmap_ret == 0,
@@ -182,12 +192,8 @@ impl PageMapExt for File {
     /// > the buffer cache by  opening  a  file,  mapping  it  with
     /// > mmap(2), and then applying mincore(2) to the mapping.
     fn resident_pages(&self) -> Result<Vec<u64>> {
-        let vm_page = vm_page_size()? as u64;
-        let len = self
-            .metadata()
-            .context("failed getting metadata for the file")?
-            .len();
-        let number_of_pages = len.div_ceil(vm_page as u64);
+        let vm_page = vm_page_size()?;
+        let number_of_pages = self.vm_pages_count()?;
 
         debug!("file has `{}` pages", number_of_pages.to_string().bold());
 
@@ -252,7 +258,7 @@ impl PageMapExt for File {
             .metadata()
             .context("failed getting metadata for the file")?
             .len();
-        let number_of_pages = len.div_ceil(vm_page as u64) as usize;
+        let number_of_pages = self.vm_pages_count()?;
 
         // SAFETY: we have exclusive access to the file.
         let mmap_address = unsafe {
@@ -279,7 +285,7 @@ impl PageMapExt for File {
 }
 
 /// return `PageMapEntry` for `page` from /proc/self/pagemap
-pub fn get_page_map_entry(page: usize) -> Result<PageMapEntry> {
+pub fn get_page_map_entry(page: u64) -> Result<PageMapEntry> {
     let pagemap_file = OpenOptions::new()
         .read(true)
         .open("/proc/self/pagemap")
@@ -287,7 +293,7 @@ pub fn get_page_map_entry(page: usize) -> Result<PageMapEntry> {
 
     let mut buf = [0u8; 8];
     pagemap_file
-        .read_exact_at(&mut buf, (page * size_of::<PageMapEntry>()) as u64)
+        .read_exact_at(&mut buf, page * size_of::<PageMapEntry>() as u64)
         .context("faild to read first entry")?;
 
     let raw_entry = u64::from_ne_bytes(buf);
@@ -341,17 +347,44 @@ impl std::fmt::Display for PageMapEntry {
     }
 }
 
-pub fn vm_page_size() -> Result<usize> {
+pub fn vm_page_size() -> Result<u64> {
     Ok(sysconf(nix::unistd::SysconfVar::PAGE_SIZE)
         .context("failed to get sys page size")?
-        .expect("page_size should be a supported option") as usize)
+        .expect("page_size should be a supported option") as u64)
 }
 
 #[cfg(test)]
 mod test {
-    use bitflags::Flags;
+    use std::{
+        fs::{File, OpenOptions},
+        io::Write,
+        ops::{Deref, DerefMut},
+        os::unix::fs::OpenOptionsExt,
+        path::Path,
+        time::{SystemTime, UNIX_EPOCH},
+    };
 
-    use crate::pagemap::PageMapEntry;
+    use crate::pagemap::{PageMapEntry, PageMapExt};
+
+    pub struct TestFile(std::path::PathBuf, File);
+    impl Deref for TestFile {
+        type Target = File;
+
+        fn deref(&self) -> &Self::Target {
+            return &self.1;
+        }
+    }
+    impl DerefMut for TestFile {
+        fn deref_mut(&mut self) -> &mut Self::Target {
+            &mut self.1
+        }
+    }
+    impl Drop for TestFile {
+        // cleanup
+        fn drop(&mut self) {
+            let _ = std::fs::remove_file(self.0.as_path());
+        }
+    }
 
     #[test]
     fn test_page_map_entry_pfn() {
@@ -368,5 +401,38 @@ mod test {
                 .to_string()
                 .contains("Run again as root")
         );
+    }
+
+    #[test]
+    fn test_out_of_bounds_page_info() {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let filename = Path::new("..").join(format!("target/test-{}.txt", nanos));
+
+        let mut file = TestFile(
+            filename.to_path_buf(),
+            OpenOptions::new()
+                .create(true)
+                .write(true)
+                .read(true)
+                .open(filename)
+                .unwrap(),
+        );
+
+        // file is empty, there are no pages
+        assert!(
+            file.page_info(0)
+                .unwrap_err()
+                .to_string()
+                .contains("out of bounds")
+        );
+
+        file.write_all(&[0u8; 0x1000]).unwrap();
+        file.sync_all().unwrap();
+
+        assert!(file.page_info(0).is_ok());
+        assert!(file.page_info(1).is_err());
     }
 }

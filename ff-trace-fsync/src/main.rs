@@ -35,7 +35,7 @@ struct Args {
     mode: Mode,
     /// the total number of pages to use for the test file
     #[arg(short, long, default_value_t = 1)]
-    pages: usize,
+    pages: u64,
     /// a comma separated list of ranges to fail e.g. 0,3-5
     #[arg(long)]
     fail_pages: Option<String>,
@@ -120,7 +120,7 @@ fn main() -> Result<()> {
         &file,
         FallocateFlags::empty(),
         0,
-        (args.pages * fs_block_size) as i64,
+        args.pages as i64 * fs_block_size as i64,
     ) {
         Err(Errno::EOPNOTSUPP) => {
             println!("=> fallocate is not supported on this filesystem");
@@ -136,7 +136,7 @@ fn main() -> Result<()> {
 
     let extent = dbg_extent(&file)?;
 
-    let mut buf = vec![0u8; args.pages * fs_block_size];
+    let mut buf = vec![0u8; (args.pages * fs_block_size) as usize];
     buf.fill(120);
 
     file.write_at("HELLO!!!".as_bytes(), 0x1000)?;
@@ -232,7 +232,7 @@ fn dbg_extent(file: &File) -> Result<fiemap::FiemapExtent> {
     debug!(
         " {}\t {}",
         "fs pages in extent".dimmed(),
-        extent.fe_length / fs_block_size as u64
+        extent.fe_length / fs_block_size
     );
 
     Ok(*extent)
