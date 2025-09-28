@@ -125,5 +125,151 @@ fn test_cached_file() -> Result<(), Box<dyn std::error::Error>> {
         .success()
         .stdout(predicate::str::contains("1/1 20B/20B"));
 
+    // write a second page
+    file.write_at("I don't like writing tests".as_bytes(), 0x1000)?;
+    file.sync_all()?;
+
+    // the two pages should be cached
+    cmd.assert()
+        .success()
+        .stdout(predicate::str::contains("2/2 4.03KiB/4.03KiB"));
+
+    file.evict_pages()?;
+
+    // touch the second page, bring it into cache
+    let mut buf = [0u8; 1];
+    file.read_exact_at(&mut buf, 0x1000)?;
+
+    cmd.assert()
+        .success()
+        .stdout(predicate::str::contains("1/2 4KiB/4.03KiB"));
+
+    Ok(())
+}
+
+#[test]
+fn test_verbose_output_without_root() -> Result<(), Box<dyn std::error::Error>> {
+    let mut cmd = Command::cargo_bin("ff-cache")?;
+    let mut file = TestFile::new();
+    file.write_all("I like writing tests".as_bytes())?;
+    file.sync_all()?;
+
+    cmd.arg(file.path()).arg("-v");
+    cmd.assert()
+        .failure()
+        .stdout(predicate::str::contains("1/1 20B/20B"))
+        .stderr(predicate::str::contains(
+            "The page is present but the PFN is hidden. Run again as root",
+        ));
+
+    Ok(())
+}
+
+#[test]
+#[ignore]
+fn test_verbose_output_run_as_root() -> Result<(), Box<dyn std::error::Error>> {
+    let mut cmd = Command::cargo_bin("ff-cache")?;
+    let mut file = TestFile::new();
+    file.write_all("I like writing tests".as_bytes())?;
+    file.sync_all()?;
+
+    cmd.arg(file.path()).arg("-v");
+    cmd.assert()
+        .success()
+        .stdout(predicate::str::contains("1/1 20B/20B"))
+        .stdout(predicate::str::contains(
+            "kflags (KPageFlags)\t  UPTODATE | LRU | MMAP | 0x800000000",
+        ))
+        .stdout(predicate::str::contains(
+            "pagemap (PageMapEntry)\t  SOFT_DIRTY | EXCL_MAP | FILE_PAGE_OR_SHARED_ANON | PRESENT",
+        ));
+
+    Ok(())
+}
+
+#[macro_export]
+macro_rules! ff_assert_cmd {
+    ($stdout:expr, $expected:expr $(,)?) => {{
+        use regex::Regex;
+        use similar_asserts::assert_eq;
+
+        fn normalize(s: &str) -> String {
+            let hex_addr = Regex::new(r"0x[0-9a-fA-F]+").unwrap();
+            let ws = Regex::new(r"[ \t]+").unwrap();
+
+            let s = hex_addr.replace_all(s, "<ADDR>");
+            let s = ws.replace_all(&s, " ");
+            let s = s.into_owned();
+            let s = s.replace("DIRTY | LRU | MMAP", "DIRTY | <MAYBE_LRU> | MMAP");
+            let s = s.replace("DIRTY | MMAP", "DIRTY | <MAYBE_LRU> | MMAP");
+            let s = s.replace("UPTODATE | MMAP", "UPTODATE | <MAYBE_LRU> | MMAP");
+            let s = s.replace("UPTODATE | LRU | MMAP", "UPTODATE | <MAYBE_LRU> | MMAP");
+            s
+        }
+
+        let got = normalize($stdout).trim().to_string();
+        let want = normalize($expected).trim().to_string();
+        assert_eq!(got, want);
+    }};
+}
+
+#[test]
+#[ignore]
+fn test_verbose_output_dirty_pages_run_as_root() -> Result<(), Box<dyn std::error::Error>> {
+    let mut cmd = Command::cargo_bin("ff-cache")?;
+    let mut file = TestFile::new();
+    file.write_all("I like writing tests".as_bytes())?;
+
+    let output = cmd
+        .arg(file.path())
+        .arg("-v")
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let stdout = String::from_utf8(output).unwrap();
+    ff_assert_cmd!(
+        stdout.as_str(),
+        r#"
+Resident Pages: 1/1 20B/20B
+PAGE 0
+ pagemap (PageMapEntry)  SOFT_DIRTY | EXCL_MAP | FILE_PAGE_OR_SHARED_ANON | PRESENT | <ADDR>
+ kflags (KPageFlags)   UPTODATE | DIRTY | <MAYBE_LRU> | MMAP | <ADDR>
+"#
+    );
+
+    Ok(())
+}
+
+#[test]
+#[ignore]
+fn test_verbose_output_clean_pages_run_as_root() -> Result<(), Box<dyn std::error::Error>> {
+    let mut cmd = Command::cargo_bin("ff-cache")?;
+    let mut file = TestFile::new();
+    file.write_all("I like writing tests".as_bytes())?;
+    file.sync_all()?;
+
+    let output = cmd
+        .arg(file.path())
+        .arg("-v")
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let stdout = String::from_utf8(output).unwrap();
+    ff_assert_cmd!(
+        stdout.as_str(),
+        r#"
+Resident Pages: 1/1 20B/20B
+PAGE 0
+ pagemap (PageMapEntry)  SOFT_DIRTY | EXCL_MAP | FILE_PAGE_OR_SHARED_ANON | PRESENT | <ADDR>
+ kflags (KPageFlags)   UPTODATE | <MAYBE_LRU> | MMAP | <ADDR>
+"#
+    );
+
     Ok(())
 }

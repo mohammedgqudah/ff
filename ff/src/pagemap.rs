@@ -364,7 +364,6 @@ mod test {
         fs::{File, OpenOptions},
         io::Write,
         ops::{Deref, DerefMut},
-        os::unix::fs::OpenOptionsExt,
         path::Path,
         time::{SystemTime, UNIX_EPOCH},
     };
@@ -409,7 +408,8 @@ mod test {
     }
 
     #[test]
-    fn test_out_of_bounds_page_info() {
+    #[ignore]
+    fn test_out_of_bounds_page_info_run_as_root() {
         let nanos = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
