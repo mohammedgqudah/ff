@@ -319,7 +319,6 @@ fn test_show_dirty_pages_run_as_root() -> Result<(), Box<dyn std::error::Error>>
 fn test_show_zero_dirty_pages_run_as_root() -> Result<(), Box<dyn std::error::Error>> {
     let mut cmd = Command::cargo_bin("ff-cache")?;
     let mut file = TestFile::new();
-    // fill 10 pages
     file.write(&[0u8; 0x1000])?;
     file.sync_all()?;
 
