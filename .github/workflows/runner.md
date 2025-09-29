@@ -4,6 +4,9 @@
 2- add `/etc/sudoers.d/github-runner`
 ```
 runner_username ALL=(ALL) NOPASSWD: /home/runner/.cargo/bin/cargo test run_as_root *
+Defaults:runner !env_reset
+Defaults:runner env_keep += "*"
+Defaults:runner setenv
 ```
 3- install packages
 ```

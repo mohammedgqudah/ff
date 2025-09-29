@@ -20,8 +20,6 @@ jobs:
       run: cargo check
     - name: Run (non-root) tests
       run: cargo test
-    # /etc/sudoeros.d/github-runner
-    # runner ALL=(ALL) NOPASSWD: /usr/bin/cargo test run_as_root *
     - name: Run (root) tests
       run: sudo -E cargo test run_as_root -- --ignored
     - name: Run clippy
