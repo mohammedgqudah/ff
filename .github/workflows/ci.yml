@@ -1,0 +1,44 @@
+name: Rust
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  check:
+    runs-on: self-hosted
+    steps:
+    - uses: actions/checkout@v4
+    - run: echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+    - name: check
+      run: cargo check
+
+  clippy:
+    runs-on: self-hosted
+    steps:
+    - uses: actions/checkout@v4
+    - run: echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+    - name: Run clippy
+      run: cargo clippy -- -D warnings
+
+  fmt:
+    runs-on: self-hosted
+    steps:
+    - uses: actions/checkout@v4
+    - run: echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+    - name: Run fmt
+      run: cargo fmt -- --check
+
+  test:
+    runs-on: self-hosted
+    steps:
+    - uses: actions/checkout@v4
+    - run: echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+    - name: Run (non-root) tests
+      run: cargo test
+    - name: Run (root) tests
+      run: sudo -E cargo test run_as_root -- --ignored
