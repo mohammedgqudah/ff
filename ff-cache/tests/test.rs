@@ -273,3 +273,73 @@ PAGE 0
 
     Ok(())
 }
+
+#[test]
+#[ignore]
+fn test_show_dirty_pages_run_as_root() -> Result<(), Box<dyn std::error::Error>> {
+    let mut cmd = Command::cargo_bin("ff-cache")?;
+    let mut file = TestFile::new();
+    let mut buf = [0u8];
+    // fill 10 pages
+    file.write(&[0u8; 4096 * 10])?;
+    file.sync_all()?;
+    file.evict_pages()?;
+
+    // dirty three pages
+    file.write_at("dirty".as_bytes(), 0x1000)?;
+    file.write_at("dirty".as_bytes(), 0x2000)?;
+    file.write_at("dirty".as_bytes(), 0x4000)?;
+    // cache one page
+    file.read_exact_at(&mut buf, 0x9000)?;
+
+    let output = cmd
+        .arg(file.path())
+        .arg("--dirty")
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let stdout = String::from_utf8(output).unwrap();
+    ff_assert_cmd!(
+        stdout.as_str(),
+        r###"
+        Resident Pages: 4/10 16KiB/40KiB
+        Dirty Pages: 3/10
+        1-2, 4
+        "###
+    );
+
+    Ok(())
+}
+
+#[test]
+#[ignore]
+fn test_show_zero_dirty_pages_run_as_root() -> Result<(), Box<dyn std::error::Error>> {
+    let mut cmd = Command::cargo_bin("ff-cache")?;
+    let mut file = TestFile::new();
+    // fill 10 pages
+    file.write(&[0u8; 0x1000])?;
+    file.sync_all()?;
+
+    let output = cmd
+        .arg(file.path())
+        .arg("--dirty")
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let stdout = String::from_utf8(output).unwrap();
+    ff_assert_cmd!(
+        stdout.as_str(),
+        r###"
+        Resident Pages: 1/1 4KiB/4KiB
+        Dirty Pages: 0/1
+        "###
+    );
+
+    Ok(())
+}
