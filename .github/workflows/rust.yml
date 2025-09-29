@@ -17,9 +17,9 @@ jobs:
       run: echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
     - uses: actions/checkout@v4
     - name: Build
-      run: cargo check --verbose
+      run: cargo check
     - name: Run (non-root) tests
-      run: cargo test --verbose
+      run: cargo test
     # /etc/sudoeros.d/github-runner
     # runner ALL=(ALL) NOPASSWD: /usr/bin/cargo test run_as_root *
     - name: Run (root) tests
