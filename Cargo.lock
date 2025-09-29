@@ -494,6 +494,7 @@ dependencies = [
  "clap",
  "colored",
  "env_logger",
+ "fastrand",
  "ff",
  "humansize",
  "log",

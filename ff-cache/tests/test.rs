@@ -8,7 +8,6 @@ use std::{
     os::unix::fs::FileExt,
     path::Path,
     process::Command,
-    time::{SystemTime, UNIX_EPOCH},
 };
 
 pub struct TestFile(std::path::PathBuf, File);
@@ -21,11 +20,8 @@ impl TestFile {
     /// file in `/tmp` is that it does not make sense to write tests against `tmpfs`.
     pub fn new() -> Self {
         // generate a random filename
-        let nanos = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
-        let filename = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("test-{}.txt", nanos));
+        let random: String = (0..12).map(|_| fastrand::alphanumeric()).collect();
+        let filename = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("test-{}.txt", random));
         let file = OpenOptions::new()
             .create(true)
             .write(true)
