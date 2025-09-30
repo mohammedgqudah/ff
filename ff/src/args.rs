@@ -1,5 +1,5 @@
 use anyhow::{Context, Result, ensure};
-use std::ops::Range;
+use std::ops::RangeInclusive;
 
 /// Parse argument as a range.
 ///
@@ -10,7 +10,7 @@ use std::ops::Range;
 /// assert_eq!(parse_as_range("10").unwrap(), 10..11);
 /// assert_eq!(parse_as_range("10-15").unwrap(), 10..15); // [10, 15)
 /// ```
-pub fn parse_as_range<S: AsRef<str>>(range: S) -> Result<Range<u64>> {
+pub fn parse_as_range<S: AsRef<str>>(range: S) -> Result<RangeInclusive<u64>> {
     let mut parts = range.as_ref().splitn(2, '-');
     let first = parts.next().expect("split has at least one item");
     let first = first.parse::<u64>().context(format!(
@@ -29,9 +29,9 @@ pub fn parse_as_range<S: AsRef<str>>(range: S) -> Result<Range<u64>> {
                 "{second} is not a number. `{}` is not a valid range",
                 range.as_ref()
             ))?;
-            first..second
+            first..=second
         }
-        None => first..first + 1,
+        None => first..=first,
     })
 }
 
@@ -40,12 +40,9 @@ mod test {
     use super::parse_as_range;
 
     #[test]
-    fn it_parses_a_single_number() {
-        assert_eq!(parse_as_range("10").unwrap(), 10..11);
-    }
-
-    #[test]
-    fn it_parses_a_range() {
-        assert_eq!(parse_as_range("20-27").unwrap(), 20..27);
+    fn test_parser() {
+        assert_eq!(parse_as_range("10").unwrap(), 10..=10);
+        assert_eq!(parse_as_range("20-27").unwrap(), 20..=27);
+        assert_eq!(parse_as_range("0-1").unwrap(), 0..=1);
     }
 }
