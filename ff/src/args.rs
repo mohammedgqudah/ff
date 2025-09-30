@@ -7,8 +7,8 @@ use std::ops::RangeInclusive;
 /// ```rust
 /// use ff::args::parse_as_range;
 ///
-/// assert_eq!(parse_as_range("10").unwrap(), 10..11);
-/// assert_eq!(parse_as_range("10-15").unwrap(), 10..15); // [10, 15)
+/// assert_eq!(parse_as_range("10").unwrap(), 10..=10);
+/// assert_eq!(parse_as_range("10-15").unwrap(), 10..=15); // [10, 15]
 /// ```
 pub fn parse_as_range<S: AsRef<str>>(range: S) -> Result<RangeInclusive<u64>> {
     let mut parts = range.as_ref().splitn(2, '-');
