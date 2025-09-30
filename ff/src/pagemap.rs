@@ -164,7 +164,7 @@ impl PageMapExt for File {
         }
 
         let pagemap_entry = get_page_map_entry((mmap_address as u64) / vm_page)?;
-        // ideally, this should never error because we faulted the page.
+        // ideally, this should never error because we faulted the page and made it "present".
         let pfn = pagemap_entry.pfn()?.context(format!(
             "the PFN for {} is not present",
             self.as_fd().as_raw_fd()
