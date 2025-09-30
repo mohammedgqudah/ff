@@ -19,6 +19,7 @@ use std::{
     },
 };
 
+/// Convert the result of a C function to [`std::io::Error`]. A non-zero return is an error.
 macro_rules! cvt {
     ($expr:expr) => {{
         let ret = $expr;
@@ -172,14 +173,11 @@ impl PageMapExt for File {
         let kpage_flags = get_kernel_page(pfn)?;
 
         // SAFETY: we are unmapping an mmaped region that we no longer use or need.
-        let munmap_ret = unsafe { munmap(mmap_address, vm_page as _) };
-
-        ensure!(
-            munmap_ret == 0,
+        cvt!(unsafe { munmap(mmap_address, vm_page as _) }).context(format!(
             "failed to munmap page `{}` for `{}`",
             page,
             self.as_fd().as_raw_fd()
-        );
+        ))?;
 
         Ok((pagemap_entry, kpage_flags))
     }
@@ -223,27 +221,19 @@ impl PageMapExt for File {
         let mut vec = vec![0u8; number_of_pages as usize];
 
         // SAFETY: vec is large enough and is a buffer of bytes
-        let mincore_ret = unsafe {
+        cvt!(unsafe {
             mincore(
                 mmap_address,
                 (vm_page * number_of_pages) as usize,
                 vec.as_mut_ptr() as _,
             )
-        };
-        ensure!(
-            mincore_ret == 0,
-            "mincore(2) failed for `{}`",
-            self.as_raw_fd(),
-        );
+        })
+        .context(format!("mincore(2) failed for `{}`", self.as_raw_fd(),))?;
 
         // SAFETY: we are unmapping an mmaped region that we no longer use or need.
-        let munmap_ret = unsafe { munmap(mmap_address, (vm_page * number_of_pages) as usize) };
-
-        ensure!(
-            munmap_ret == 0,
-            "failed to munmap page `{}`",
-            self.as_fd().as_raw_fd()
-        );
+        cvt!(unsafe { munmap(mmap_address, (vm_page * number_of_pages) as usize) }).context(
+            format!("failed to munmap page `{}`", self.as_fd().as_raw_fd()),
+        )?;
 
         Ok(vec
             .iter()
@@ -283,8 +273,8 @@ impl PageMapExt for File {
             self.as_raw_fd(),
         );
 
-        let ret = unsafe { posix_fadvise64(self.as_raw_fd(), 0, len as _, POSIX_FADV_DONTNEED) };
-        assert!(ret == 0, "couldnt evict");
+        cvt!(unsafe { posix_fadvise64(self.as_raw_fd(), 0, len as _, POSIX_FADV_DONTNEED) })
+            .context("failed to evict pages")?;
         Ok(())
     }
 }
