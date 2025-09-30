@@ -1,8 +1,6 @@
 //! inspect file page maps.
 use anyhow::{Context, Result, ensure};
 use bitflags::bitflags;
-use colored::Colorize;
-use log::debug;
 use nix::{
     libc::{
         MADV_RANDOM, MAP_FAILED, MAP_PRIVATE, MAP_SHARED, POSIX_FADV_DONTNEED, PROT_NONE,
@@ -142,7 +140,7 @@ impl PageMapExt for File {
 
         ensure!(
             mmap_address != MAP_FAILED,
-            "failed to mmap page `{}` for `{}`: {:#?}",
+            "failed to mmap page `{}` for `{}`: {}",
             page,
             self.as_fd().as_raw_fd(),
             std::io::Error::last_os_error()
@@ -197,8 +195,6 @@ impl PageMapExt for File {
             return Ok(vec![]);
         }
 
-        debug!("file has `{}` pages", number_of_pages.to_string().bold());
-
         // SAFETY: we have exclusive access to the file.
         let mmap_address = unsafe {
             mmap64(
@@ -213,7 +209,7 @@ impl PageMapExt for File {
 
         ensure!(
             mmap_address != MAP_FAILED,
-            "failed to mmap file `{}`: {:#?}",
+            "failed to mmap file `{}`: {}",
             self.as_raw_fd(),
             std::io::Error::last_os_error()
         );
