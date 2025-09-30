@@ -242,7 +242,7 @@ impl PageMapExt for File {
             .collect())
     }
 
-    /// Returns a list of file pages present in the page cache.
+    /// Evict all pages from page cache.
     fn evict_pages(&self) -> Result<()> {
         let vm_page = vm_page_size()?;
         let len = self
