@@ -40,7 +40,7 @@ PAGE 2560
 ## ff-bench-fsync
 benchmark `fsync(2)` and related system calls.
 
-[![asciicast](https://asciinema.org/a/3M0aK63AYTkEvswiAHnwcuSle.svg)](https://asciinema.org/a/3M0aK63AYTkEvswiAHnwcuSle)
+[![asciicast](https://asciinema.org/a/orYnxYPLO82QWoMJvBLHWu65U.svg)](https://asciinema.org/a/orYnxYPLO82QWoMJvBLHWu65U)
 
 ## creating a drive partition for benchmarking and testing
 
