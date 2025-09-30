@@ -128,3 +128,39 @@ pub fn msflags_from_mount_opts(opts: &str) -> Result<(MsFlags, Vec<String>)> {
 
     Ok((flags, fs_data))
 }
+
+#[cfg(test)]
+mod test {
+    use nix::mount::MsFlags;
+
+    use super::msflags_from_mount_opts;
+
+    #[test]
+    pub fn test_parse_msflags() {
+        assert_eq!(
+            msflags_from_mount_opts("").unwrap(),
+            (MsFlags::empty(), vec![])
+        );
+        assert_eq!(
+            msflags_from_mount_opts("sync,silent").unwrap(),
+            (
+                MsFlags::empty() | MsFlags::MS_SILENT | MsFlags::MS_SYNCHRONOUS,
+                vec![]
+            )
+        );
+        assert_eq!(
+            msflags_from_mount_opts("sync,silent,data=journal").unwrap(),
+            (
+                MsFlags::empty() | MsFlags::MS_SILENT | MsFlags::MS_SYNCHRONOUS,
+                vec!["data=journal".into()]
+            )
+        );
+        assert_eq!(
+            msflags_from_mount_opts("sync,silent,data=journal,bigalloc").unwrap(),
+            (
+                MsFlags::empty() | MsFlags::MS_SILENT | MsFlags::MS_SYNCHRONOUS,
+                vec!["data=journal".into(), "bigalloc".into()]
+            )
+        );
+    }
+}
