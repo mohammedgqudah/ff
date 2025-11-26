@@ -150,7 +150,7 @@ impl PageMapExt for File {
         // will bring adjecent pages into cache.
         //
         // Note: The man page doesn't explicitly say that `MADV_RANDOM` is guaranteed to disable readahead,
-        // but it strongly suggets that, and the kernel function `do_sync_mmap_readahead` returns
+        // but it strongly suggets that. Also, at the time of writing this, the kernel function `do_sync_mmap_readahead` returns
         // early if the VMA has the RAND_READ flag.
         cvt!(unsafe { madvise(mmap_address, vm_page as _, MADV_RANDOM) })
             .context("failed to disable readahead on mmaped region")?;
