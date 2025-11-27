@@ -242,32 +242,20 @@ impl PageMapExt for File {
             .collect())
     }
 
-    /// Evict all pages from page cache.
+    /// Attempt to evict all pages from page cache for the file.
+    ///
+    /// There is no way to know if the pages were actually evicted or not, because
+    /// posix_fadvise does not return this information.
+    ///
+    /// The kernel function `remove_mapping` in `vmscan.c` states that eviction will fail if:
+    /// 1. The folio is under writeback
+    /// 2. The folio is referenced by someone else
+    /// 3. The folio is dirty.
     fn evict_pages(&self) -> Result<()> {
-        let vm_page = vm_page_size()?;
         let len = self
             .metadata()
             .context("failed getting metadata for the file")?
             .len();
-        let number_of_pages = self.vm_pages_count()?;
-
-        // SAFETY: we have exclusive access to the file.
-        let mmap_address = unsafe {
-            mmap64(
-                std::ptr::null_mut(),
-                (vm_page * number_of_pages) as usize,
-                PROT_NONE,
-                MAP_PRIVATE,
-                self.as_fd().as_raw_fd(),
-                0,
-            )
-        };
-
-        ensure!(
-            mmap_address != MAP_FAILED,
-            "faied to mmap file `{}`",
-            self.as_raw_fd(),
-        );
 
         cvt!(unsafe { posix_fadvise64(self.as_raw_fd(), 0, len as _, POSIX_FADV_DONTNEED) })
             .context("failed to evict pages")?;
