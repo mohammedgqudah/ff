@@ -1,0 +1,44 @@
+name: Build Release Binaries
+
+permissions:
+  contents: write
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      CARGO_TARGET_DIR: ~/.cargo-target
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Cache Rust build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo-target
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Build release binaries
+        run: cargo build --release --bins
+
+      - name: Upload release binary
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            ~/.cargo-target/release/ff-cache
+            ~/.cargo-target/release/ff-trace-fsync
+            ~/.cargo-target/release/ff-bench-fsync
+            ~/.cargo-target/release/ff-bench-atime
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
