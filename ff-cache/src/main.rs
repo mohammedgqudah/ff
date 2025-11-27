@@ -1,4 +1,4 @@
-//! Bring file pages into the page cache and print their details
+//! Show information about the cached pages of a specific file.
 use anyhow::{Context, Result};
 use clap::Parser;
 use colored::Colorize;
@@ -18,6 +18,9 @@ struct Args {
     /// Evict all cached pages.
     #[arg(short = 'e', long, default_value_t = false)]
     evict: bool,
+    /// Show dirty pages
+    #[arg(short = 'd', long, default_value_t = false)]
+    dirty: bool,
     /// Verbose output.
     ///
     /// This will show the PageMapEntry flags (see man 5 proc_pid_pagemap), and
@@ -25,21 +28,21 @@ struct Args {
     /// physical page frame flags (see man 5 proc_kpageflags) for each cached page.
     #[arg(short = 'v', long, default_value_t = false)]
     verbose: bool,
-    /// Show dirty pages
-    #[arg(short = 'd', long, default_value_t = false)]
-    dirty: bool,
 }
 
 fn main() -> Result<()> {
     let args = Args::parse();
-    env_logger::Builder::new()
+    env_logger::builder()
         .format(|buf, record| {
-            writeln!(
-                buf,
-                "{}: {}",
-                record.level().to_string().blue(),
-                record.args()
-            )
+            let warn_style = buf.default_level_style(record.level());
+            match record.level() {
+                log::Level::Info => {
+                    writeln!(buf, "{}", record.args())
+                }
+                _ => {
+                    writeln!(buf, "{warn_style}{}{warn_style:#}", record.args())
+                }
+            }
         })
         .filter(
             None,

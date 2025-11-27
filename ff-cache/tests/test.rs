@@ -1,4 +1,4 @@
-use assert_cmd::prelude::*;
+use assert_cmd::{cargo, prelude::*};
 use ff::pagemap::PageMapExt;
 use predicates::prelude::*;
 use std::{
@@ -60,7 +60,7 @@ impl Drop for TestFile {
 
 #[test]
 fn test_non_existent_file() -> Result<(), Box<dyn std::error::Error>> {
-    let mut cmd = Command::cargo_bin("ff-cache")?;
+    let mut cmd = Command::new(cargo::cargo_bin!());
     cmd.arg("foobar");
     cmd.assert()
         .failure()
@@ -71,7 +71,7 @@ fn test_non_existent_file() -> Result<(), Box<dyn std::error::Error>> {
 
 #[test]
 fn test_empty_file() -> Result<(), Box<dyn std::error::Error>> {
-    let mut cmd = Command::cargo_bin("ff-cache")?;
+    let mut cmd = Command::new(cargo::cargo_bin!());
     let file = TestFile::new();
     cmd.arg(file.path());
     cmd.assert()
@@ -84,7 +84,7 @@ fn test_empty_file() -> Result<(), Box<dyn std::error::Error>> {
 
 #[test]
 fn test_non_cached_file() -> Result<(), Box<dyn std::error::Error>> {
-    let mut cmd = Command::cargo_bin("ff-cache")?;
+    let mut cmd = Command::new(cargo::cargo_bin!());
     let mut file = TestFile::new();
     file.write_all("I like writing tests".as_bytes())?;
     file.sync_all()?;
@@ -100,7 +100,7 @@ fn test_non_cached_file() -> Result<(), Box<dyn std::error::Error>> {
     file.sync_all()?;
     file.evict_pages()?;
 
-    let mut cmd = Command::cargo_bin("ff-cache")?;
+    let mut cmd = Command::new(cargo::cargo_bin!());
     cmd.arg(file.path());
     cmd.assert()
         .success()
@@ -111,7 +111,7 @@ fn test_non_cached_file() -> Result<(), Box<dyn std::error::Error>> {
 
 #[test]
 fn test_cached_file() -> Result<(), Box<dyn std::error::Error>> {
-    let mut cmd = Command::cargo_bin("ff-cache")?;
+    let mut cmd = Command::new(cargo::cargo_bin!());
     let mut file = TestFile::new();
     file.write_all("I like writing tests".as_bytes())?;
     file.sync_all()?;
@@ -145,7 +145,7 @@ fn test_cached_file() -> Result<(), Box<dyn std::error::Error>> {
 
 #[test]
 fn test_verbose_output_without_root() -> Result<(), Box<dyn std::error::Error>> {
-    let mut cmd = Command::cargo_bin("ff-cache")?;
+    let mut cmd = Command::new(cargo::cargo_bin!());
     let mut file = TestFile::new();
     file.write_all("I like writing tests".as_bytes())?;
     file.sync_all()?;
@@ -164,7 +164,7 @@ fn test_verbose_output_without_root() -> Result<(), Box<dyn std::error::Error>> 
 #[test]
 #[ignore]
 fn test_verbose_output_run_as_root() -> Result<(), Box<dyn std::error::Error>> {
-    let mut cmd = Command::cargo_bin("ff-cache")?;
+    let mut cmd = Command::new(cargo::cargo_bin!());
     let mut file = TestFile::new();
     file.write_all("I like writing tests".as_bytes())?;
     file.sync_all()?;
@@ -212,7 +212,7 @@ macro_rules! ff_assert_cmd {
 #[test]
 #[ignore]
 fn test_verbose_output_dirty_pages_run_as_root() -> Result<(), Box<dyn std::error::Error>> {
-    let mut cmd = Command::cargo_bin("ff-cache")?;
+    let mut cmd = Command::new(cargo::cargo_bin!());
     let mut file = TestFile::new();
     file.write_all("I like writing tests".as_bytes())?;
 
@@ -242,7 +242,7 @@ PAGE 0
 #[test]
 #[ignore]
 fn test_verbose_output_clean_pages_run_as_root() -> Result<(), Box<dyn std::error::Error>> {
-    let mut cmd = Command::cargo_bin("ff-cache")?;
+    let mut cmd = Command::new(cargo::cargo_bin!());
     let mut file = TestFile::new();
     file.write_all("I like writing tests".as_bytes())?;
     file.sync_all()?;
@@ -273,7 +273,7 @@ PAGE 0
 #[test]
 #[ignore]
 fn test_show_dirty_pages_run_as_root() -> Result<(), Box<dyn std::error::Error>> {
-    let mut cmd = Command::cargo_bin("ff-cache")?;
+    let mut cmd = Command::new(cargo::cargo_bin!());
     let mut file = TestFile::new();
     let mut buf = [0u8];
     // fill 10 pages
@@ -313,7 +313,7 @@ fn test_show_dirty_pages_run_as_root() -> Result<(), Box<dyn std::error::Error>>
 #[test]
 #[ignore]
 fn test_show_zero_dirty_pages_run_as_root() -> Result<(), Box<dyn std::error::Error>> {
-    let mut cmd = Command::cargo_bin("ff-cache")?;
+    let mut cmd = Command::new(cargo::cargo_bin!());
     let mut file = TestFile::new();
     file.write(&[0u8; 0x1000])?;
     file.sync_all()?;
