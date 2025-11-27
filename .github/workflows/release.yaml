@@ -35,10 +35,10 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            target/release/ff-cache
-            target/release/ff-trace-fsync
-            target/release/ff-bench-fsync
-            target/release/ff-bench-atime
+            ~/.cargo-target/release/ff-cache
+            ~/.cargo-target/release/ff-trace-fsync
+            ~/.cargo-target/release/ff-bench-fsync
+            ~/.cargo-target/release/ff-bench-atime
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
