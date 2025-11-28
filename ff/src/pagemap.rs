@@ -93,7 +93,7 @@ bitflags! {
 pub trait PageMapExt {
     fn page_info(&self, page: u64) -> Result<(PageMapEntry, KPageFlags)>;
     fn evict_pages(&self) -> Result<()>;
-    fn resident_pages(&self) -> Result<Vec<u64>>;
+    fn cached_pages(&self) -> Result<Vec<u64>>;
     fn fs_block_size(&self) -> Result<u64>;
     fn vm_pages_count(&self) -> Result<u64>;
 }
@@ -187,7 +187,7 @@ impl PageMapExt for File {
     /// > One can obtain a snapshot of which pages of a file are resident in
     /// > the buffer cache by  opening  a  file,  mapping  it  with
     /// > mmap(2), and then applying mincore(2) to the mapping.
-    fn resident_pages(&self) -> Result<Vec<u64>> {
+    fn cached_pages(&self) -> Result<Vec<u64>> {
         let vm_page = vm_page_size()?;
         let number_of_pages = self.vm_pages_count()?;
 

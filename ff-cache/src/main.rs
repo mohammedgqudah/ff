@@ -65,7 +65,7 @@ fn main() -> Result<()> {
     debug!("fs block size: {}", fs_block_size);
     debug!("vm page size: {}", vm_page_size);
 
-    let resident_pages = file.resident_pages()?;
+    let cached_pages = file.cached_pages()?;
 
     let len = file
         .metadata()
@@ -79,26 +79,26 @@ fn main() -> Result<()> {
     if args.evict {
         file.evict_pages()?;
         println!(
-            "\t\tEvicted {}/{} {}/{}",
-            resident_pages.len().to_string().bold(),
-            number_of_pages.to_string().bold(),
-            format_size(
-                min((resident_pages.len() as u64) * vm_page_size, len),
+            "\t\tEvicted {cached}/{total} {cached_size}/{total_size}",
+            cached = cached_pages.len().to_string().bold(),
+            total = number_of_pages.to_string().bold(),
+            cached_size = format_size(
+                min((cached_pages.len() as u64) * vm_page_size, len),
                 formatter
             )
             .bold(),
-            format_size(len, formatter).bold()
+            total_size = format_size(len, formatter).bold()
         );
 
         return Ok(());
     }
 
     println!(
-        "\t\tResident Pages: {}/{} {}/{}",
-        resident_pages.len().to_string().bold(),
+        "\t\tCached Pages: {}/{} {}/{}",
+        cached_pages.len().to_string().bold(),
         number_of_pages.to_string().bold(),
         format_size(
-            min((resident_pages.len() as u64) * vm_page_size, len),
+            min((cached_pages.len() as u64) * vm_page_size, len),
             formatter
         )
         .bold(),
@@ -107,7 +107,7 @@ fn main() -> Result<()> {
 
     // show dirty pages in cache
     if args.dirty {
-        let dirty_pages = resident_pages
+        let dirty_pages = cached_pages
             .iter()
             .map(|page| {
                 let (_, kflags) = file.page_info(*page)?;
@@ -125,11 +125,12 @@ fn main() -> Result<()> {
             dirty_pages.len().to_string().bold(),
             number_of_pages.to_string().bold(),
         );
+        // show which pages are dirty
         println!("\t\t             {}", fmt_ranges(dirty_pages.as_slice()));
     }
 
     if args.verbose {
-        for i in resident_pages {
+        for i in cached_pages {
             let (pagemap, kflags) = file.page_info(i)?;
             println!("{} {}", "PAGE".bold(), i.to_string().cyan());
 

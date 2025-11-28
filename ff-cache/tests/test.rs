@@ -229,7 +229,7 @@ fn test_verbose_output_dirty_pages_run_as_root() -> Result<(), Box<dyn std::erro
     ff_assert_cmd!(
         stdout.as_str(),
         r#"
-Resident Pages: 1/1 20B/20B
+Cached Pages: 1/1 20B/20B
 PAGE 0
  pagemap (PageMapEntry)  SOFT_DIRTY | EXCL_MAP | FILE_PAGE_OR_SHARED_ANON | PRESENT | <ADDR>
  kflags (KPageFlags)   UPTODATE | DIRTY | <MAYBE_LRU> | MMAP | <ADDR>
@@ -260,7 +260,7 @@ fn test_verbose_output_clean_pages_run_as_root() -> Result<(), Box<dyn std::erro
     ff_assert_cmd!(
         stdout.as_str(),
         r#"
-Resident Pages: 1/1 20B/20B
+Cached Pages: 1/1 20B/20B
 PAGE 0
  pagemap (PageMapEntry)  SOFT_DIRTY | EXCL_MAP | FILE_PAGE_OR_SHARED_ANON | PRESENT | <ADDR>
  kflags (KPageFlags)   UPTODATE | <MAYBE_LRU> | MMAP | <ADDR>
@@ -301,7 +301,7 @@ fn test_show_dirty_pages_run_as_root() -> Result<(), Box<dyn std::error::Error>>
     ff_assert_cmd!(
         stdout.as_str(),
         r###"
-        Resident Pages: 4/10 16KiB/40KiB
+        Cached Pages: 4/10 16KiB/40KiB
         Dirty Pages: 3/10
         1-2, 4
         "###
@@ -331,7 +331,7 @@ fn test_show_zero_dirty_pages_run_as_root() -> Result<(), Box<dyn std::error::Er
     ff_assert_cmd!(
         stdout.as_str(),
         r###"
-        Resident Pages: 1/1 4KiB/4KiB
+        Cached Pages: 1/1 4KiB/4KiB
         Dirty Pages: 0/1
         "###
     );
