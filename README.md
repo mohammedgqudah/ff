@@ -29,25 +29,25 @@ Show or evict cached pages in the page cache.
 
 It is similar to [`vmtouch`](https://github.com/hoytech/vmtouch) but you can show dirty pages and inspect page mapping flags.
 
-```shell
+```console
 $ ff-cache target.txt
                 Resident Pages: 0/2560 0B/10MiB
 ```
-```
+```console
 $ ff-cache target.txt
                 Resident Pages: 12/2560 48KiB/10MiB
 ```
-```
+```console
 $ sudo ff-cache target.txt --dirty
                 Resident Pages: 13/2561 52KiB/10.00MiB
                 Dirty Pages: 1/2561
                              2560
 ```
-```
+```console
 $ sudo ff-cache target.txt -e
                 Evicted 13/2561 52KiB/10.00MiB
 ```
-```
+```console
 $ sudo ff-cache target.txt --dirty
                 Resident Pages: 1/2561 4KiB/10.00MiB
                 Dirty Pages: 0/2561
