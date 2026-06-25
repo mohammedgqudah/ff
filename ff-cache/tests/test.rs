@@ -155,7 +155,7 @@ fn test_verbose_output_without_root() -> Result<(), Box<dyn std::error::Error>> 
         .failure()
         .stdout(predicate::str::contains("1/1 20B/20B"))
         .stderr(predicate::str::contains(
-            "The page is present but the PFN is hidden. Run again as root",
+            "PFNs are hidden (requires root or CAP_SYS_ADMIN)",
         ));
 
     Ok(())
