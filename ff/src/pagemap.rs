@@ -306,7 +306,8 @@ impl PageMapEntry {
         if self.contains(PageMapEntry::PRESENT) {
             ensure!(
                 pfn != 0,
-                "The page is present but the PFN is hidden. Run again as root."
+                "/proc/self/pagemap: PFNs are hidden (requires root or CAP_SYS_ADMIN). \
+                \n       Kernel Page Flags cannot be read without physical frame access."
             );
             Ok(Some(pfn))
         } else {
