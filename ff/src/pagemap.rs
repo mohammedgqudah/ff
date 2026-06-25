@@ -378,7 +378,7 @@ mod test {
                 .pfn()
                 .unwrap_err()
                 .to_string()
-                .contains("Run again as root")
+                .contains("requires root or CAP_SYS_ADMIN")
         );
     }
 
